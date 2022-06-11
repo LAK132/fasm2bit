@@ -1,0 +1,6 @@
+[submodule "lak"]
+	path = lak
+	url = https://github.com/LAK132/lak
+[submodule "database"]
+	path = database
+	url = https://github.com/SymbiFlow/prjxray-db
