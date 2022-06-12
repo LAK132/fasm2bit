@@ -1,10 +1,13 @@
 #include "bit.hpp"
+#include "csv.hpp"
 #include "database.hpp"
 #include "fasm.hpp"
 #include "fasm2bit.hpp"
+#include "json.hpp"
 
 #include "lak/result.hpp"
 #include "lak/stdint.hpp"
+#include "lak/string_literals.hpp"
 
 #include <vector>
 
@@ -46,8 +49,6 @@ struct argument_iterator
 	bool empty() { return argc <= 0; }
 };
 
-void fasm_test();
-
 lak::result<lak::monostate> res_main(int argc, const char **argv)
 {
 	argument_iterator arg_iter{.argc = argc - 1, .argv = argv + 1};
@@ -68,15 +69,18 @@ lak::result<lak::monostate> res_main(int argc, const char **argv)
 			std::cout << help_string << "\n";
 			return lak::ok_t{};
 		}
-		else if (command == "--test")
+		else if (command == "--test"_view)
 		{
+			json_test();
+			csv_test();
 			fasm_test();
+			return lak::ok_t{};
 		}
-		else if (command == "--compressed")
+		else if (command == "--compressed"_view)
 		{
 			compressed = true;
 		}
-		else if (command == "--uncompressed")
+		else if (command == "--uncompressed"_view)
 		{
 			compressed = false;
 		}
@@ -113,7 +117,9 @@ lak::result<lak::monostate> res_main(int argc, const char **argv)
 		}
 	} while (!arg_iter.empty());
 
-	RES_TRY_ASSIGN(std::vector<byte_t> fasm_file =,
+	// --- fasm ---
+
+	RES_TRY_ASSIGN(const std::vector<char> fasm_file =,
 	               read_file(fasm_path).map_err(
 	                 [&](const auto &err) -> lak::monostate
 	                 {
@@ -122,18 +128,76 @@ lak::result<lak::monostate> res_main(int argc, const char **argv)
 		                 return {};
 	                 }));
 
-	RES_TRY_ASSIGN(std::vector<fasm_parser::line> fasm_lines =,
-	               fasm_parser{.input = lak::astring_view(
-	                             lak::span<const char>(lak::span(fasm_file)))}
+	RES_TRY_ASSIGN(
+	  std::vector<fasm_parser::line> fasm_lines =,
+	  fasm_parser{lak::astring_view(lak::span(fasm_file))}.parse().map_err(
+	    [&](const auto &err) -> lak::monostate
+	    {
+		    user_error("Failed to parse fasm file ", fasm_path, ": ", err);
+		    return {};
+	    }));
+
+	for (const auto &line : fasm_lines) DEBUG(line);
+
+	// --- package pins csv ---
+
+	const fs::path package_pins_csv_path =
+	  database_path / family_name / package_name / "package_pins.csv";
+
+	RES_TRY_ASSIGN(const std::vector<char> package_pins_file =,
+	               read_file(package_pins_csv_path)
+	                 .map_err(
+	                   [&](const auto &err) -> lak::monostate
+	                   {
+		                   user_error("Failed to open package pins file ",
+		                              package_pins_csv_path,
+		                              ": ",
+		                              err);
+		                   return {};
+	                   }));
+
+	RES_TRY_ASSIGN(std::vector<csv_parser::line> package_pins =,
+	               csv_parser{lak::astring_view(lak::span(package_pins_file))}
 	                 .parse()
 	                 .map_err(
 	                   [&](const auto &err) -> lak::monostate
 	                   {
-		                   user_error("Failed to read fasm file: ", err);
+		                   user_error("Failed to parse package pins file ",
+		                              package_pins_csv_path,
+		                              ": ",
+		                              err);
 		                   return {};
 	                   }));
 
-	for (const auto &line : fasm_lines) DEBUG(line);
+	for (const auto &line : package_pins) DEBUG(line);
+
+	// --- part json ---
+
+	const fs::path part_json_path =
+	  database_path / family_name / package_name / "part.json";
+
+	RES_TRY_ASSIGN(
+	  const std::vector<char> part_json_file =,
+	  read_file(part_json_path)
+	    .map_err(
+	      [&](const auto &err) -> lak::monostate
+	      {
+		      user_error("Failed to open part file ", part_json_path, ": ", err);
+		      return {};
+	      }));
+
+	RES_TRY_ASSIGN(
+	  const json_parser::value_type part_json =,
+	  json_parser{lak::astring_view(lak::span(part_json_file))}.parse().map_err(
+	    [&](const auto &err) -> lak::monostate
+	    {
+		    user_error("Failed to parse part file ", part_json_path, ": ", err);
+		    return {};
+	    }));
+
+	DEBUG(part_json);
+
+	// --- database ---
 
 	RES_TRY_ASSIGN(
 	  database db =,

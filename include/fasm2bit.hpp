@@ -12,7 +12,7 @@ namespace fs = std::filesystem;
 
 extern const lak::astring_view help_string;
 
-lak::errno_result<std::vector<byte_t>> read_file(const fs::path &path);
+lak::errno_result<std::vector<char>> read_file(const fs::path &path);
 
 inline int user_error(const auto &...ars)
 {

@@ -2,6 +2,7 @@
 #define FASM_HPP
 
 #include "bigint.hpp"
+#include "parser.hpp"
 
 #include "lak/optional.hpp"
 #include "lak/result.hpp"
@@ -11,32 +12,8 @@
 
 #include <ostream>
 
-struct fasm_parser
+struct fasm_parser : public basic_parser
 {
-	lak::astring_view input;
-
-	enum struct error_type
-	{
-		end_of_file          = 0,
-		unexpected_character = 1,
-		integer_overflow     = 2,
-	};
-
-	template<typename T>
-	using result = lak::result<T, error_type>;
-
-	result<char> peek() const;
-	result<char> pop();
-
-	result<char> peek_char(std::initializer_list<char> c);
-	result<char> pop_char(std::initializer_list<char> c);
-
-	result<char> peek_not_char(std::initializer_list<char> c);
-	result<char> pop_not_char(std::initializer_list<char> c);
-
-	result<lak::astring_view> peek_string(lak::astring_view str);
-	result<lak::astring_view> pop_string(lak::astring_view str);
-
 	result<lak::astring_view> parse_non_newline_whitespace();
 
 	result<lak::astring_view> parse_identifier();
@@ -95,9 +72,6 @@ struct fasm_parser
 };
 
 std::ostream &operator<<(std::ostream &strm,
-                         const fasm_parser::error_type &err);
-
-std::ostream &operator<<(std::ostream &strm,
                          const fasm_parser::verilog_value &value);
 
 std::ostream &operator<<(std::ostream &strm,
@@ -110,5 +84,7 @@ std::ostream &operator<<(std::ostream &strm,
                          const fasm_parser::fasm_feature &value);
 
 std::ostream &operator<<(std::ostream &strm, const fasm_parser::line &value);
+
+void fasm_test();
 
 #endif

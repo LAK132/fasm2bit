@@ -2,88 +2,6 @@
 
 #include "lak/string_literals.hpp"
 
-fasm_parser::result<char> fasm_parser::peek() const
-{
-	if (input.empty()) return lak::err_t{error_type::end_of_file};
-
-	return lak::ok_t{input[0]};
-}
-
-fasm_parser::result<char> fasm_parser::pop()
-{
-	if (input.empty()) return lak::err_t{error_type::end_of_file};
-
-	char result = input[0];
-	input       = input.substr(1);
-	return lak::ok_t{result};
-}
-
-fasm_parser::result<char> fasm_parser::peek_char(std::initializer_list<char> c)
-{
-	RES_TRY_ASSIGN(const char v =, peek());
-	for (const char i : c)
-		if (i == v) return lak::ok_t{v};
-	return lak::err_t{error_type::unexpected_character};
-}
-
-fasm_parser::result<char> fasm_parser::pop_char(std::initializer_list<char> c)
-{
-	RES_TRY_ASSIGN(const char v =, peek());
-	for (const char i : c)
-	{
-		if (i == v)
-		{
-			pop().unwrap();
-			return lak::ok_t{v};
-		}
-	}
-	return lak::err_t{error_type::unexpected_character};
-}
-
-fasm_parser::result<char> fasm_parser::peek_not_char(
-  std::initializer_list<char> c)
-{
-	RES_TRY_ASSIGN(const char v =, peek());
-	for (const char i : c)
-		if (i == v) return lak::err_t{error_type::unexpected_character};
-	return lak::ok_t{v};
-}
-
-fasm_parser::result<char> fasm_parser::pop_not_char(
-  std::initializer_list<char> c)
-{
-	RES_TRY_ASSIGN(const char v =, peek());
-	for (const char i : c)
-		if (i == v) return lak::err_t{error_type::unexpected_character};
-	pop().unwrap();
-	return lak::ok_t{v};
-}
-
-fasm_parser::result<lak::astring_view> fasm_parser::peek_string(
-  lak::astring_view str)
-{
-	if (input.size() < str.size())
-		return lak::err_t{error_type::end_of_file};
-	else if (const auto substr = input.first(str.size()); substr == str)
-		return lak::ok_t{substr};
-	else
-		return lak::err_t{error_type::unexpected_character};
-}
-
-fasm_parser::result<lak::astring_view> fasm_parser::pop_string(
-  lak::astring_view str)
-{
-	if (input.size() < str.size())
-		return lak::err_t{error_type::end_of_file};
-	else if (const auto substr = input.first(str.size()); substr == str)
-	{
-		input = input.substr(str.size());
-		return lak::ok_t{substr};
-	}
-	else
-		return lak::err_t{error_type::unexpected_character};
-}
-
 fasm_parser::result<lak::astring_view>
 fasm_parser::parse_non_newline_whitespace()
 {
@@ -451,7 +369,6 @@ fasm_parser::result<lak::astring_view> fasm_parser::parse_comment()
 	while (pop_not_char({'\n', '\r'}).is_ok())
 		;
 
-	DEBUG(lak::astring_view(begin, input.begin()));
 	return lak::ok_t{lak::astring_view(begin, input.begin())};
 }
 
@@ -606,20 +523,6 @@ fasm_parser::result<std::vector<fasm_parser::line>> fasm_parser::parse()
 	}
 
 	return lak::ok_t{lak::move(result)};
-}
-
-std::ostream &operator<<(std::ostream &strm,
-                         const fasm_parser::error_type &err)
-{
-	switch (err)
-	{
-		case fasm_parser::error_type::end_of_file: return strm << "end of file";
-		case fasm_parser::error_type::unexpected_character:
-			return strm << "unexpected character";
-		case fasm_parser::error_type::integer_overflow:
-			return strm << "integer overflow";
-		default: ASSERT_UNREACHABLE();
-	}
 }
 
 std::ostream &operator<<(std::ostream &strm,
